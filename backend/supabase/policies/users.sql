@@ -13,6 +13,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- Helper function to get a user's role without triggering RLS recursion
+-- Uses SECURITY DEFINER to bypass RLS
+CREATE OR REPLACE FUNCTION public.get_user_role(user_id UUID)
+RETURNS public.user_role AS $$
+BEGIN
+  RETURN (
+    SELECT role FROM public.users
+    WHERE id = user_id
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- Policies
 
 -- 1. SELECT: Users can view their own profile, Admins can view all profiles
@@ -46,7 +58,7 @@ WITH CHECK (
   public.is_admin()
   OR (
     auth.uid() = id 
-    AND (SELECT role FROM public.users WHERE id = auth.uid()) = role
+    AND public.get_user_role(auth.uid()) = role
   )
 );
 
