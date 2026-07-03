@@ -1,0 +1,18 @@
+/* This imports all of Tailwind v4 */
+@import "tailwindcss";
+
+/* Define your custom Founders' Club colors here */
+@theme {
+  --color-club-navy: #0F172A;
+  --color-club-steel: #334155;
+  --color-club-gold: #F59E0B;
+  --color-club-bg: #F8FAFC;
+}
+
+/* Optional: Set the default background and text colors for the whole app */
+@layer base {
+  body {
+    background-color: var(--color-club-bg);
+    color: var(--color-club-navy);
+  }
+}
