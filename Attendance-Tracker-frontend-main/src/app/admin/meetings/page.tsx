@@ -1,15 +1,16 @@
-export default function ManageMeetingsPage() {
+"use client";
+
+import { MeetingManagement } from "@/components/MeetingManagement";
+
+export default function MeetingsPage() {
   return (
-    <div className="max-w-5xl">
-      <h3 className="text-2xl font-bold tracking-tight text-zinc-950 mb-2">Manage Meetings</h3>
-      <p className="text-sm text-zinc-500 mb-6">
-        Create new meetings, generate QR codes, and view attendance records.
-      </p>
-      
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-12 text-center shadow-sm">
-        <p className="text-sm font-medium text-zinc-600">
-          Person 5 will build the Meeting Creator and List here.
-        </p>
+    <div className="min-h-screen bg-[#F7F8FC] p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-[#14213D] mb-8">
+          Meeting Management
+        </h1>
+
+        <MeetingManagement />
       </div>
     </div>
   );

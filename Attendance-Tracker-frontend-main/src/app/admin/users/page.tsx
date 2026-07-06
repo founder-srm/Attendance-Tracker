@@ -1,15 +1,16 @@
-export default function ManageUsersPage() {
+"use client";
+
+import { MemberManagement } from "@/components/MemberManagement";
+
+export default function MembersPage() {
   return (
-    <div className="max-w-5xl">
-      <h3 className="text-2xl font-bold tracking-tight text-zinc-950 mb-2">Manage Users</h3>
-      <p className="text-sm text-zinc-500 mb-6">
-        View all members, update roles, and manage club access.
-      </p>
-      
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-12 text-center shadow-sm">
-        <p className="text-sm font-medium text-zinc-600">
-          Person 5 will build the Users Data Table here.
-        </p>
+    <div className="min-h-screen bg-[#F7F8FC] py-8">
+      <div className="max-w-7xl mx-auto px-6">
+        <h1 className="text-4xl font-bold text-[#14213D] mb-8">
+          Member Management
+        </h1>
+
+        <MemberManagement />
       </div>
     </div>
   );
