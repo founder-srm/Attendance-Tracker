@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { RoleBadge } from "@/components/RoleBadge";
+import { getDomainColorClass } from "@/lib/domainColors";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -17,18 +19,16 @@ type Member = {
   id: string;
   full_name: string;
   email: string;
+  domain: string | null;
+  position_title: string;
 };
-
-// "present" = row exists  |  null = no row (absent, not yet recorded)
-// Once the schema migration runs, "excused" will also be available.
-type AttendanceStatus = "present" | null;
 
 type MemberRow = Member & {
   attendanceRowId: string | null;
-  status: AttendanceStatus;
+  status: "present" | "absent" | "excused" | null;
+  pre_meeting_notice_status: "none" | "not_attending";
+  pre_meeting_notice_reason: string | null;
 };
-
-// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ManualAttendancePanel() {
   const { profile } = useAuth();
@@ -37,6 +37,7 @@ export default function ManualAttendancePanel() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>("");
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [meetingsLoading, setMeetingsLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -75,7 +76,7 @@ export default function ManualAttendancePanel() {
       // 1. All members
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("id, full_name, email")
+        .select("id, full_name, email, domain, position_title")
         .order("full_name", { ascending: true });
 
       if (usersError) {
@@ -87,7 +88,7 @@ export default function ManualAttendancePanel() {
       // 2. Existing attendance records for this meeting
       const { data: attData, error: attError } = await supabase
         .from("attendance")
-        .select("id, user_id")
+        .select("id, user_id, status, pre_meeting_notice_status, pre_meeting_notice_reason")
         .eq("meeting_id", meetingId);
 
       if (attError) {
@@ -96,17 +97,19 @@ export default function ManualAttendancePanel() {
         return;
       }
 
-      // 3. Merge: determine status per member by row existence
+      // 3. Merge: determine status per member
       const attMap = new Map(
-        (attData || []).map((a) => [a.user_id, a.id])
+        (attData || []).map((a) => [a.user_id, a])
       );
 
       const merged: MemberRow[] = (usersData || []).map((user) => {
-        const rowId = attMap.get(user.id) ?? null;
+        const att = attMap.get(user.id);
         return {
           ...user,
-          attendanceRowId: rowId,
-          status: rowId ? "present" : null,
+          attendanceRowId: att?.id ?? null,
+          status: att?.status ?? null,
+          pre_meeting_notice_status: att?.pre_meeting_notice_status ?? "none",
+          pre_meeting_notice_reason: att?.pre_meeting_notice_reason ?? null
         };
       });
 
@@ -141,7 +144,7 @@ export default function ManualAttendancePanel() {
 
     try {
       if (member.status === "present") {
-        // Mark absent: delete the attendance row
+        // Mark absent/delete row
         const { error } = await supabase
           .from("attendance")
           .delete()
@@ -158,14 +161,17 @@ export default function ManualAttendancePanel() {
         );
         showToast(`${member.full_name} marked absent`);
       } else {
-        // Mark present: upsert a row
-        // Uses onConflict to prevent duplicates — safe to call repeatedly.
-        // NOTE: When the schema migration (001_add_attendance_status_source.sql)
-        // has been applied, add `source: 'manual', marked_by: profile.id` here.
+        // Mark present
         const { data, error } = await supabase
           .from("attendance")
           .upsert(
-            { meeting_id: selectedMeetingId, user_id: member.id },
+            {
+              meeting_id: selectedMeetingId,
+              user_id: member.id,
+              status: "present",
+              source: "manual",
+              marked_by: profile.id
+            },
             { onConflict: "meeting_id,user_id" }
           )
           .select("id")
@@ -202,7 +208,7 @@ export default function ManualAttendancePanel() {
   const markAll = async (markPresent: boolean) => {
     if (!selectedMeetingId || !profile?.id || saving.size > 0) return;
 
-    const targets = members.filter((m) =>
+    const targets = filteredMembers.filter((m) =>
       markPresent ? m.status !== "present" : m.status === "present"
     );
     if (targets.length === 0) return;
@@ -213,7 +219,12 @@ export default function ManualAttendancePanel() {
     }
   };
 
-  // ── Derived stats ──────────────────────────────────────────────────────────
+  // ── Derived stats & search ──────────────────────────────────────────────────
+
+  const filteredMembers = members.filter((m) =>
+    m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const presentCount = members.filter((m) => m.status === "present").length;
   const totalCount = members.length;
@@ -286,7 +297,7 @@ export default function ManualAttendancePanel() {
 
       {/* Members Table */}
       {selectedMeetingId && (
-        <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden space-y-4">
           {/* Table header */}
           <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -322,6 +333,17 @@ export default function ManualAttendancePanel() {
             )}
           </div>
 
+          {/* Real-time search filter */}
+          <div className="px-6">
+            <input
+              type="text"
+              placeholder="Search members by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-950"
+            />
+          </div>
+
           {/* Rows */}
           {membersLoading ? (
             <div className="divide-y divide-zinc-100">
@@ -335,14 +357,15 @@ export default function ManualAttendancePanel() {
                 </div>
               ))}
             </div>
-          ) : members.length === 0 ? (
+          ) : filteredMembers.length === 0 ? (
             <p className="text-sm text-zinc-400 text-center py-12">
-              No members found in the system.
+              No matching members found.
             </p>
           ) : (
             <div className="divide-y divide-zinc-100">
-              {members.map((member) => {
+              {filteredMembers.map((member) => {
                 const isPresent = member.status === "present";
+                const isExcused = member.status === "excused";
                 const isSaving = saving.has(member.id);
 
                 return (
@@ -350,14 +373,34 @@ export default function ManualAttendancePanel() {
                     key={member.id}
                     className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 transition-colors"
                   >
-                    {/* Member info */}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-950 truncate">
-                        {member.full_name}
-                      </p>
-                      <p className="text-xs text-zinc-400 truncate">
-                        {member.email}
-                      </p>
+                    {/* Member info with Badge + Domain color pill */}
+                    <div className="min-w-0 flex items-center gap-2">
+                      <RoleBadge position={member.position_title} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-950 truncate flex items-center gap-2">
+                          <span>{member.full_name}</span>
+                          {member.domain && (
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getDomainColorClass(
+                                member.domain
+                              )}`}
+                            >
+                              {member.domain}
+                            </span>
+                          )}
+                          {member.pre_meeting_notice_status === "not_attending" && (
+                            <span
+                              title={member.pre_meeting_notice_reason || "Pre-meeting absent notice"}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-red-50 text-red-700 border-red-200 animate-pulse cursor-help"
+                            >
+                              ⚠️ Notice: {member.pre_meeting_notice_reason || "Not Attending"}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-zinc-400 truncate">
+                          {member.email}
+                        </p>
+                      </div>
                     </div>
 
                     {/* Status + toggle */}
@@ -367,10 +410,12 @@ export default function ManualAttendancePanel() {
                         className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-colors ${
                           isPresent
                             ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                            : isExcused
+                            ? "text-blue-700 bg-blue-50 border-blue-200"
                             : "text-zinc-400 bg-zinc-50 border-zinc-200"
                         }`}
                       >
-                        {isPresent ? "Present" : "Absent"}
+                        {isPresent ? "Present" : isExcused ? "Excused" : "Absent"}
                       </span>
 
                       {/* Toggle button */}
@@ -398,15 +443,6 @@ export default function ManualAttendancePanel() {
           )}
         </div>
       )}
-
-      {/* Schema note */}
-      <p className="text-xs text-zinc-400">
-        Note: &ldquo;Excused&rdquo; status requires running{" "}
-        <code className="font-mono bg-zinc-100 px-1 rounded">
-          001_add_attendance_status_source.sql
-        </code>{" "}
-        in your Supabase project first.
-      </p>
     </div>
   );
 }
