@@ -31,20 +31,9 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const supabase = createClient();
-
-  //  TEMPORARY MOCK DATA FOR UI TESTING
-  // const [session, setSession] = useState<any>({ user: { id: 'mock-123' } });
-
-  // const [profile, setProfile] = useState<any>({
-  //   id: 'mock-123',
-  //   full_name: 'Test Profile',
-  //   email: 'test@founders.com',
-  //   // role: 'member' // <-- CHANGE THIS TO 'admin' TO TEST THE ADMIN PORTAL!
-  //   role: 'admin'
-  // });
-
-  // const [loading, setLoading] = useState(false); // Important: Keep this false!
+  // Stable client reference — createBrowserClient is a singleton internally,
+  // but calling it on every render is wasteful. Use useState initializer.
+  const [supabase] = useState(() => createClient());
 
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -53,120 +42,106 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Helper to fetch the custom user profile from the database
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
+  // Fetch (or auto-create) the public.users profile for an authenticated user.
+  const fetchOrCreateProfile = async (authUser: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, string>;
+  }): Promise<UserProfile | null> => {
+    const { data: existingProfile, error } = await supabase
       .from("users")
       .select("*")
-      .eq("id", userId)
+      .eq("id", authUser.id)
       .single();
 
-    if (error) {
-      console.error("Error fetching user profile:", error);
+    if (!error && existingProfile) {
+      return existingProfile as UserProfile;
+    }
+
+    // BUG-5 FIX: No DB trigger creates the public.users row on signup.
+    // Auto-create it here using auth metadata as the fallback source of truth.
+    // The RLS INSERT policy allows this because auth.uid() === authUser.id.
+    console.warn(
+      "No profile found for user — auto-creating from auth metadata. " +
+        "Ask the backend team to add a Supabase trigger for production."
+    );
+
+    const fallbackName =
+      authUser.user_metadata?.full_name ??
+      authUser.email?.split("@")[0] ??
+      "Member";
+
+    const { data: newProfile, error: createError } = await supabase
+      .from("users")
+      .insert({
+        id: authUser.id,
+        email: authUser.email ?? "",
+        full_name: fallbackName,
+        role: "member", // Default role for all self-signed-up users
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("Failed to auto-create profile:", createError.message);
       return null;
     }
-    return data as UserProfile;
+
+    return newProfile as UserProfile;
   };
-
-  // useEffect(() => {
-  //   let mounted = true;
-
-  //   const initializeAuth = async () => {
-  //     const { data: { session } } = await supabase.auth.getSession();
-
-  //     if (session) {
-  //       const userProfile = await fetchProfile(session.user.id);
-  //       if (mounted) {
-  //         setSession(session);
-  //         setProfile(userProfile);
-  //         setLoading(false);
-  //       }
-  //     } else {
-  //       if (mounted) {
-  //         setSession(null);
-  //         setProfile(null);
-  //         setLoading(false);
-  //       }
-  //     }
-  //   };
-
-  //   initializeAuth();
-
-  //   // Listen for auth state changes (Login/Logout)
-  //   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-  //     if (newSession) {
-  //       const userProfile = await fetchProfile(newSession.user.id);
-  //       setSession(newSession);
-  //       setProfile(userProfile);
-  //     } else {
-  //       setSession(null);
-  //       setProfile(null);
-  //     }
-  //     setLoading(false);
-  //   });
-
-  //   return () => {
-  //     mounted = false;
-  //     subscription.unsubscribe();
-  //   };
-  // }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        // 1. Get the active session
         const {
-          data: { session },
+          data: { session: currentSession },
           error: sessionError,
         } = await supabase.auth.getSession();
 
         if (sessionError) throw sessionError;
-        if (mounted) setSession(session);
 
-        // 2. Try to fetch the profile ONLY if we have a session
-        if (session?.user) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
+        if (!mounted) return;
+        setSession(currentSession);
 
-          if (profileError) {
-            // WARNING: This will trigger until the backend dev runs the SQL!
-            console.warn(
-              "Profile fetch failed (waiting for DB trigger):",
-              profileError.message,
-            );
-          } else if (mounted && profileData) {
-            setProfile(profileData);
-          }
+        if (currentSession?.user) {
+          const userProfile = await fetchOrCreateProfile(currentSession.user);
+          if (mounted) setProfile(userProfile);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
       } finally {
-        setLoading(false); // <-- CRITICAL: This guarantees the loading screen dismisses
+        if (mounted) setLoading(false); // CRITICAL: always dismiss loading screen
       }
     };
 
     initializeAuth();
 
-    // Listen for login/logout events
+    // Listen for login / logout events
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setSession(session);
-        // If they just logged out, clear the profile and finish loading
-        if (!session) {
-          setProfile(null);
-          setLoading(false);
-        } else {
-          // If they logged in, re-run the initialization
-          setLoading(true);
-          initializeAuth();
-        }
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (!mounted) return;
+
+      setSession(newSession);
+
+      if (!newSession) {
+        // User logged out
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      // User logged in or token refreshed — sync the profile
+      setLoading(true);
+      try {
+        const userProfile = await fetchOrCreateProfile(newSession.user);
+        if (mounted) setProfile(userProfile);
+      } catch (err) {
+        console.error("Profile sync error on auth change:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
     });
 
@@ -174,9 +149,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Strict Role-Based Routing logic
+  // Strict Role-Based Routing
   useEffect(() => {
     if (loading) return;
 
@@ -186,16 +162,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const isAdminRoute = pathname?.startsWith("/admin");
 
     if (!session) {
-      // Unauthenticated users cannot access protected routes
+      // Unauthenticated — middleware handles the heavy lifting, but client-side
+      // guard catches any edge cases.
       if (isDashboard || isAdminRoute) {
         router.push("/login");
       }
     } else if (profile) {
-      // Authenticated routing based on Role
       if (profile.role === "admin") {
-        if (isAuthPage || isDashboard) router.push("/admin"); // Admins belong in /admin
+        if (isAuthPage || isDashboard) router.push("/admin");
       } else if (profile.role === "member") {
-        if (isAuthPage || isAdminRoute) router.push("/dashboard"); // Members belong in /dashboard
+        if (isAuthPage || isAdminRoute) router.push("/dashboard");
       }
     }
   }, [session, profile, loading, pathname, router]);
@@ -215,7 +191,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ) : (
         <div className="min-h-screen flex items-center justify-center bg-zinc-50">
           <div className="animate-pulse font-medium text-zinc-500">
-            Loading Founders' Club...
+            Loading Founders&apos; Club...
           </div>
         </div>
       )}
