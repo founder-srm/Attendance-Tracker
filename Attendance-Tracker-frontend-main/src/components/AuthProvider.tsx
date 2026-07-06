@@ -11,6 +11,11 @@ export interface UserProfile {
   full_name: string;
   email: string;
   role: "admin" | "member";
+  avatar_url?: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+  domain?: string | null;
+  position_title?: string;
   created_at: string;
 }
 
@@ -20,6 +25,8 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isMember: boolean;
+  isViewingAsMember: boolean;
+  setViewingAsMember: (val: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,19 +35,35 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isMember: false,
+  isViewingAsMember: false,
+  setViewingAsMember: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // Stable client reference — createBrowserClient is a singleton internally,
-  // but calling it on every render is wasteful. Use useState initializer.
   const [supabase] = useState(() => createClient());
 
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isViewingAsMember, setViewingAsMemberState] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
+
+  // Load member view state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("fc-member-view-mode");
+      setViewingAsMemberState(stored === "true");
+    }
+  }, []);
+
+  const setViewingAsMember = (val: boolean) => {
+    setViewingAsMemberState(val);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fc-member-view-mode", val ? "true" : "false");
+    }
+  };
 
   // Fetch (or auto-create) the public.users profile for an authenticated user.
   const fetchOrCreateProfile = async (authUser: {
@@ -58,9 +81,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return existingProfile as UserProfile;
     }
 
-    // BUG-5 FIX: No DB trigger creates the public.users row on signup.
-    // Auto-create it here using auth metadata as the fallback source of truth.
-    // The RLS INSERT policy allows this because auth.uid() === authUser.id.
     console.warn(
       "No profile found for user — auto-creating from auth metadata. " +
         "Ask the backend team to add a Supabase trigger for production."
@@ -77,7 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         id: authUser.id,
         email: authUser.email ?? "",
         full_name: fallbackName,
-        role: "member", // Default role for all self-signed-up users
+        role: "member", // Default role
       })
       .select()
       .single();
@@ -112,13 +132,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (error) {
         console.error("Auth initialization error:", error);
       } finally {
-        if (mounted) setLoading(false); // CRITICAL: always dismiss loading screen
+        if (mounted) setLoading(false);
       }
     };
 
     initializeAuth();
 
-    // Listen for login / logout events
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
@@ -127,13 +146,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(newSession);
 
       if (!newSession) {
-        // User logged out
         setProfile(null);
         setLoading(false);
         return;
       }
 
-      // User logged in or token refreshed — sync the profile
       setLoading(true);
       try {
         const userProfile = await fetchOrCreateProfile(newSession.user);
@@ -149,7 +166,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Strict Role-Based Routing
@@ -162,19 +178,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const isAdminRoute = pathname?.startsWith("/admin");
 
     if (!session) {
-      // Unauthenticated — middleware handles the heavy lifting, but client-side
-      // guard catches any edge cases.
       if (isDashboard || isAdminRoute) {
         router.push("/login");
       }
     } else if (profile) {
       if (profile.role === "admin") {
-        if (isAuthPage || isDashboard) router.push("/admin");
+        if (isViewingAsMember) {
+          // If in member-view mode: allow access to /dashboard, block /admin
+          if (isAuthPage || isAdminRoute) router.push("/dashboard");
+        } else {
+          // Normal admin mode: allow access to /admin, block /dashboard
+          if (isAuthPage || isDashboard) router.push("/admin");
+        }
       } else if (profile.role === "member") {
         if (isAuthPage || isAdminRoute) router.push("/dashboard");
       }
     }
-  }, [session, profile, loading, pathname, router]);
+  }, [session, profile, loading, pathname, router, isViewingAsMember]);
 
   return (
     <AuthContext.Provider
@@ -184,6 +204,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         isAdmin: profile?.role === "admin",
         isMember: profile?.role === "member",
+        isViewingAsMember,
+        setViewingAsMember,
       }}
     >
       {!loading ? (

@@ -2,37 +2,31 @@
 
 import { useAuth } from '@/components/AuthProvider';
 import { createClient } from '@/lib/supabase/client';
-//import { LayoutDashboard, QrCode, Users, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, QrCode, Users, LogOut, Calendar } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LayoutDashboard, QrCode, Users, LogOut, Calendar, Settings, Eye } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  // Extract profile instead of user
-  const { profile } = useAuth();
+  const { profile, isViewingAsMember, setViewingAsMember } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
 
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
   };
 
-  // const navItems = [
-  //   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  //   { name: 'Scan QR', href: '/dashboard/scan', icon: QrCode },
-  //   { name: 'Team Profile', href: '/dashboard/team', icon: Users },
-  // ];
-
   const navItems = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Scan QR', href: '/dashboard/scan', icon: QrCode },
     { name: 'Events & Volunteering', href: '/dashboard/events', icon: Calendar },
     { name: 'Team Profile', href: '/dashboard/team', icon: Users },
+    { name: 'Edit Profile', href: '/dashboard/profile', icon: Settings },
   ];
 
   return (
     <div className="flex min-h-screen bg-club-bg">
-      <aside className="w-64 bg-club-navy text-white hidden md:block">
+      <aside className="w-64 bg-club-navy text-white hidden md:block flex-shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-club-steel">
           <h1 className="text-lg font-bold text-club-gold tracking-tight">Founders' Club</h1>
         </div>
@@ -56,14 +50,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             );
           })}
+
+          {profile?.role === 'admin' && (
+            <div className="pt-4 border-t border-club-steel mt-4">
+              <button
+                onClick={() => {
+                  setViewingAsMember(false);
+                  router.push("/admin");
+                }}
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-300 hover:bg-club-steel hover:text-white text-left"
+              >
+                <Eye size={18} />
+                <span>Admin Portal</span>
+              </button>
+            </div>
+          )}
         </nav>
       </aside>
 
-      <main className="flex-1 flex flex-col">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
+      <main className="flex-1 flex flex-col min-w-0">
+        {profile?.role === 'admin' && isViewingAsMember && (
+          <div className="bg-yellow-500 text-black text-xs font-semibold px-6 py-2 flex items-center justify-between border-b border-yellow-600 flex-shrink-0">
+            <span>You are viewing the Member Dashboard in simulation mode. Your permissions remain Admin.</span>
+            <button
+              onClick={() => {
+                setViewingAsMember(false);
+                router.push("/admin");
+              }}
+              className="bg-black text-white px-3 py-1 rounded hover:bg-zinc-800 transition text-[10px]"
+            >
+              Switch to Admin View
+            </button>
+          </div>
+        )}
+
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm flex-shrink-0">
           <h2 className="text-lg font-semibold text-club-navy">Member Dashboard</h2>
           <div className="flex items-center space-x-4">
-            {/* Display full_name from the database! */}
             <span className="text-sm font-medium text-club-steel hidden sm:inline-block">
               {profile?.full_name || profile?.email || "Member"}
             </span>
@@ -77,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           {children}
         </div>
       </main>
