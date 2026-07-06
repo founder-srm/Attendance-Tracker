@@ -1,17 +1,17 @@
 "use client";
 
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
-//import { Settings, Calendar, Download, LogOut } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Settings, CalendarDays, Users, ClipboardList, Download, LogOut } from 'lucide-react';
+import { Settings, CalendarDays, Users, ClipboardList, ClipboardCheck, Download, LogOut } from 'lucide-react';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   // Extract profile instead of user
   const { profile } = useAuth();
   const pathname = usePathname();
 
   const handleLogout = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
   };
   
@@ -25,6 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Admin Dashboard', href: '/admin', icon: Settings },
         { name: 'Manage Users', href: '/admin/users', icon: Users },
         { name: 'Manage Meetings', href: '/admin/meetings', icon: ClipboardList },
+        { name: 'Manual Attendance', href: '/admin/attendance', icon: ClipboardCheck },
         { name: 'Manage Events', href: '/admin/events', icon: CalendarDays },
         { name: 'Export Reports', href: '/admin/export', icon: Download },
     ];
