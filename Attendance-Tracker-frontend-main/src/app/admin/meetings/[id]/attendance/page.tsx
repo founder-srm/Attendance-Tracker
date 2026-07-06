@@ -1,15 +1,11 @@
-"use client";
+import ManualAttendancePanel from "@/components/ManualAttendancePanel";
 
-import { AttendanceManagement } from "@/components/AttendanceManagement";
-
-export default function AttendancePage() {
-  return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-3xl font-bold text-[#14213D] mb-6">
-        Manual Attendance
-      </h1>
-
-      <AttendanceManagement />
-    </div>
-  );
+/**
+ * Per-meeting attendance page.
+ * Previously rendered AttendanceManagement (mock localStorage component).
+ * Now renders ManualAttendancePanel — the real Supabase-backed attendance tool.
+ * The [id] segment is not used here; attendance is selected inside the panel.
+ */
+export default function MeetingAttendancePage() {
+  return <ManualAttendancePanel />;
 }
