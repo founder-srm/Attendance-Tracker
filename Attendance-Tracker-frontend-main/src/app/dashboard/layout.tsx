@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 //import { LayoutDashboard, QrCode, Users, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -13,6 +13,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   const handleLogout = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
   };
 
