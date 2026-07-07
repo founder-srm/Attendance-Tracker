@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { RoleBadge } from "@/components/RoleBadge";
+import { RoleBadge } from "@/components/shared/RoleBadge";
 import { getDomainColorClass } from "@/lib/domainColors";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
