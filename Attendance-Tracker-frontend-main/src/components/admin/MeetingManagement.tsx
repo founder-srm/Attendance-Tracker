@@ -1,26 +1,36 @@
 "use client";
 
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  FileUp,
+  Play,
+  QrCode,
+  Users,
+  X,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { RoleBadge } from "@/components/shared/RoleBadge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getDomainColorClass } from "@/lib/domainColors";
 import {
-  getMeetings,
-  createMeeting,
-  updateMeeting,
-  deleteMeeting,
-  startMeetingNow,
   closeMeeting,
-  uploadMomDocument,
+  createMeeting,
+  deleteMeeting,
   getMeetingRoster,
+  getMeetings,
   type Meeting,
   type MeetingType,
   type RosterMember,
+  startMeetingNow,
+  updateMeeting,
+  uploadMomDocument,
 } from "@/services/meetings";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { RoleBadge } from "@/components/shared/RoleBadge";
-import { getDomainColorClass } from "@/lib/domainColors";
-import Link from "next/link";
-import { QrCode, FileUp, FileText, Play, CheckCircle2, Users, X, AlertCircle } from "lucide-react";
+import QRDisplay from "./QRDisplay";
 
 const MEETING_TYPES: MeetingType[] = [
   "Club",
@@ -57,7 +67,10 @@ export function MeetingManagement() {
 
   // ── Modals state ────────────────────────────────────────────────────────────
   const [qrModalMeeting, setQrModalMeeting] = useState<Meeting | null>(null);
-  const [rosterModalMeeting, setRosterModalMeeting] = useState<Meeting | null>(null);
+  const [qrRefreshKey, setQrRefreshKey] = useState(0);
+  const [rosterModalMeeting, setRosterModalMeeting] = useState<Meeting | null>(
+    null,
+  );
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
@@ -195,7 +208,7 @@ export function MeetingManagement() {
   const handleCloseMeeting = async (meetingId: string) => {
     if (
       !confirm(
-        "Are you sure you want to close this meeting? This will automatically mark all expected members who did not check in as absent."
+        "Are you sure you want to close this meeting? This will automatically mark all expected members who did not check in as absent.",
       )
     ) {
       return;
@@ -216,7 +229,7 @@ export function MeetingManagement() {
       alert("Upload failed: " + error);
     } else if (url) {
       setMeetings((prev) =>
-        prev.map((m) => (m.id === meetingId ? { ...m, mom_url: url } : m))
+        prev.map((m) => (m.id === meetingId ? { ...m, mom_url: url } : m)),
       );
       alert("MOM uploaded successfully!");
     }
@@ -368,8 +381,8 @@ export function MeetingManagement() {
             {submitting
               ? "Submitting..."
               : editingId
-              ? "Save Changes"
-              : "Schedule Meeting"}
+                ? "Save Changes"
+                : "Schedule Meeting"}
           </Button>
         </div>
       </div>
@@ -440,7 +453,9 @@ export function MeetingManagement() {
 
                   <div className="space-y-1.5 text-sm text-zinc-600 mb-5">
                     <div>
-                      <span className="font-semibold text-[#14213D]">Date: </span>
+                      <span className="font-semibold text-[#14213D]">
+                        Date:{" "}
+                      </span>
                       {meeting.date
                         ? new Date(meeting.date).toLocaleDateString("en-IN", {
                             day: "numeric",
@@ -450,15 +465,22 @@ export function MeetingManagement() {
                         : "—"}
                     </div>
                     <div>
-                      <span className="font-semibold text-[#14213D]">Scheduled: </span>
-                      {formatTimeStr(meeting.start_time)} - {formatTimeStr(meeting.end_time)}
+                      <span className="font-semibold text-[#14213D]">
+                        Scheduled:{" "}
+                      </span>
+                      {formatTimeStr(meeting.start_time)} -{" "}
+                      {formatTimeStr(meeting.end_time)}
                     </div>
                     {meeting.actual_start_at && (
                       <div className="text-emerald-700 text-xs font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-block">
-                        Started: {new Date(meeting.actual_start_at).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
+                        Started:{" "}
+                        {new Date(meeting.actual_start_at).toLocaleTimeString(
+                          "en-IN",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </div>
                     )}
                     {meeting.agenda && (
@@ -578,33 +600,95 @@ export function MeetingManagement() {
         </div>
       )}
 
-      {/* ── QR Placeholder Modal ── */}
+      {/* ── QR Code Modal ── */}
       {qrModalMeeting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-zinc-100 mx-4 animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-bold text-[#14213D] mb-2">
-              Meeting QR Code
-            </h3>
-            <p className="text-zinc-500 text-sm mb-6">
-              Use this QR code to mark attendance for: <strong className="text-zinc-800">{qrModalMeeting.title}</strong>
-            </p>
-
-            {/* Placeholder Container */}
-            <div className="bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 p-8 text-center flex flex-col items-center justify-center space-y-4">
-              <QrCode size={64} className="text-zinc-300" />
+            <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm font-semibold text-zinc-700">QR Code Placeholder</p>
-                <p className="text-xs text-zinc-400 mt-1 max-w-[240px]">
-                  QR generation will be available once the QR system is integrated — Person 3's work.
+                <h3 className="text-2xl font-bold text-[#14213D]">
+                  Meeting QR Code
+                </h3>
+                <p className="text-zinc-500 text-xs mt-1 pr-4">
+                  Attendance for:{" "}
+                  <strong className="text-zinc-800">
+                    {qrModalMeeting.title}
+                  </strong>
                 </p>
               </div>
-              <div className="bg-zinc-100 px-3 py-1 rounded-md text-[10px] font-mono text-zinc-500">
-                Payload: {qrModalMeeting.qr_payload || "—"}
-              </div>
+              <button
+                onClick={() => setQrModalMeeting(null)}
+                className="text-zinc-400 hover:text-zinc-600 p-1 bg-zinc-100 rounded-full transition"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div className="mt-6 flex justify-end">
-              <Button onClick={() => setQrModalMeeting(null)} className="rounded-xl">
+            <div className="my-6 flex flex-col items-center justify-center min-h-[320px]">
+              {qrModalMeeting.status === "closed" ? (
+                <div className="flex flex-col items-center justify-center text-center gap-2 p-4">
+                  <span className="text-4xl">🚫</span>
+                  <p className="text-sm font-semibold text-zinc-700 font-serif">
+                    Meeting is Closed
+                  </p>
+                  <p className="text-xs text-zinc-400 max-w-[220px]">
+                    The attendance window is closed. No QR code is available.
+                  </p>
+                </div>
+              ) : !qrModalMeeting.actual_start_at ? (
+                <div className="flex flex-col items-center justify-center text-center gap-4 p-4 w-full">
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800 text-xs leading-relaxed max-w-[280px]">
+                    This meeting has not started yet. You need to start the
+                    meeting to begin displaying the QR code.
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      const { data, error } = await startMeetingNow(
+                        qrModalMeeting.id,
+                      );
+                      if (error) {
+                        alert("Failed to start meeting: " + error);
+                      } else if (data) {
+                        await loadMeetings();
+                        setQrModalMeeting(data);
+                      }
+                    }}
+                    className="w-full max-w-[280px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-1.5 h-10 font-semibold"
+                  >
+                    <Play size={16} /> Start NOW & Show QR
+                  </Button>
+                </div>
+              ) : (
+                <QRDisplay
+                  key={qrRefreshKey}
+                  meetingId={qrModalMeeting.id}
+                  windowMinutes={qrModalMeeting.time_limit_minutes}
+                  actualStartAt={qrModalMeeting.actual_start_at}
+                />
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-between gap-3">
+              {qrModalMeeting.actual_start_at &&
+                qrModalMeeting.status !== "closed" && (
+                  <Button
+                    type="button"
+                    onClick={() => setQrRefreshKey((prev) => prev + 1)}
+                    className="flex-1 rounded-xl bg-zinc-950 text-white hover:bg-zinc-900 h-10 text-xs font-semibold"
+                  >
+                    Refresh QR Code
+                  </Button>
+                )}
+              <Button
+                onClick={() => setQrModalMeeting(null)}
+                variant={
+                  qrModalMeeting.actual_start_at &&
+                  qrModalMeeting.status !== "closed"
+                    ? "outline"
+                    : "default"
+                }
+                className="flex-1 rounded-xl h-10 text-xs font-semibold"
+              >
                 Close
               </Button>
             </div>
@@ -623,7 +707,10 @@ export function MeetingManagement() {
                   Attendance Roster
                 </h3>
                 <p className="text-zinc-500 text-xs mt-1">
-                  Roster reports for: <strong className="text-zinc-800">{rosterModalMeeting.title}</strong>
+                  Roster reports for:{" "}
+                  <strong className="text-zinc-800">
+                    {rosterModalMeeting.title}
+                  </strong>
                 </p>
               </div>
               <button
@@ -639,7 +726,10 @@ export function MeetingManagement() {
               {rosterLoading ? (
                 <div className="space-y-3 py-8">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-10 bg-zinc-100 rounded animate-pulse" />
+                    <div
+                      key={i}
+                      className="h-10 bg-zinc-100 rounded animate-pulse"
+                    />
                   ))}
                 </div>
               ) : rosterError ? (
@@ -652,20 +742,36 @@ export function MeetingManagement() {
                   {/* Summary Counters */}
                   <div className="grid grid-cols-4 gap-2">
                     <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 text-center">
-                      <p className="text-[9px] font-semibold text-zinc-500 uppercase">Roster Total</p>
-                      <p className="text-lg font-bold text-zinc-950">{roster.length}</p>
+                      <p className="text-[9px] font-semibold text-zinc-500 uppercase">
+                        Roster Total
+                      </p>
+                      <p className="text-lg font-bold text-zinc-950">
+                        {roster.length}
+                      </p>
                     </div>
                     <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-center">
-                      <p className="text-[9px] font-semibold text-emerald-600 uppercase">Present</p>
-                      <p className="text-lg font-bold text-emerald-700">{presentMembers.length}</p>
+                      <p className="text-[9px] font-semibold text-emerald-600 uppercase">
+                        Present
+                      </p>
+                      <p className="text-lg font-bold text-emerald-700">
+                        {presentMembers.length}
+                      </p>
                     </div>
                     <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200 text-center">
-                      <p className="text-[9px] font-semibold text-blue-600 uppercase">Excused</p>
-                      <p className="text-lg font-bold text-blue-700">{excusedMembers.length}</p>
+                      <p className="text-[9px] font-semibold text-blue-600 uppercase">
+                        Excused
+                      </p>
+                      <p className="text-lg font-bold text-blue-700">
+                        {excusedMembers.length}
+                      </p>
                     </div>
                     <div className="bg-red-50 p-2.5 rounded-xl border border-red-200 text-center">
-                      <p className="text-[9px] font-semibold text-red-600 uppercase">Absent</p>
-                      <p className="text-lg font-bold text-red-700">{absentMembers.length}</p>
+                      <p className="text-[9px] font-semibold text-red-600 uppercase">
+                        Absent
+                      </p>
+                      <p className="text-lg font-bold text-red-700">
+                        {absentMembers.length}
+                      </p>
                     </div>
                   </div>
 
@@ -675,18 +781,27 @@ export function MeetingManagement() {
                       Present ({presentMembers.length})
                     </h4>
                     {presentMembers.length === 0 ? (
-                      <p className="text-xs text-zinc-400 italic px-3 py-1">No attendees present yet.</p>
+                      <p className="text-xs text-zinc-400 italic px-3 py-1">
+                        No attendees present yet.
+                      </p>
                     ) : (
                       <div className="divide-y divide-zinc-100 bg-white rounded-lg border border-zinc-100">
                         {presentMembers.map((member) => (
-                          <div key={member.user_id} className="flex items-center justify-between py-2 px-3 hover:bg-zinc-50 transition rounded-lg">
+                          <div
+                            key={member.user_id}
+                            className="flex items-center justify-between py-2 px-3 hover:bg-zinc-50 transition rounded-lg"
+                          >
                             <div className="flex items-center gap-2.5">
                               <RoleBadge position={member.position_title} />
                               <div>
-                                <p className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}>
+                                <p
+                                  className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}
+                                >
                                   {member.full_name}
                                 </p>
-                                <p className="text-[10px] text-zinc-400 font-mono">{member.email}</p>
+                                <p className="text-[10px] text-zinc-400 font-mono">
+                                  {member.email}
+                                </p>
                               </div>
                             </div>
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-700 uppercase tracking-wider">
@@ -704,19 +819,28 @@ export function MeetingManagement() {
                       Excused ({excusedMembers.length})
                     </h4>
                     {excusedMembers.length === 0 ? (
-                      <p className="text-xs text-zinc-400 italic px-3 py-1">No members excused.</p>
+                      <p className="text-xs text-zinc-400 italic px-3 py-1">
+                        No members excused.
+                      </p>
                     ) : (
                       <div className="divide-y divide-zinc-100 bg-white rounded-lg border border-zinc-100">
                         {excusedMembers.map((member) => (
-                          <div key={member.user_id} className="py-2.5 px-3 hover:bg-zinc-50 transition rounded-lg space-y-1">
+                          <div
+                            key={member.user_id}
+                            className="py-2.5 px-3 hover:bg-zinc-50 transition rounded-lg space-y-1"
+                          >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2.5">
                                 <RoleBadge position={member.position_title} />
                                 <div>
-                                  <p className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}>
+                                  <p
+                                    className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}
+                                  >
                                     {member.full_name}
                                   </p>
-                                  <p className="text-[10px] text-zinc-400 font-mono">{member.email}</p>
+                                  <p className="text-[10px] text-zinc-400 font-mono">
+                                    {member.email}
+                                  </p>
                                 </div>
                               </div>
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 uppercase tracking-wider">
@@ -727,7 +851,9 @@ export function MeetingManagement() {
                             {/* Excuse Reason if submitted */}
                             {member.pre_meeting_notice_reason && (
                               <div className="ml-8 text-xs bg-amber-50 text-amber-900 border border-amber-200 p-2 rounded-lg">
-                                <span className="font-semibold text-[10px] uppercase text-amber-800 block mb-0.5">Excuse Reason:</span>
+                                <span className="font-semibold text-[10px] uppercase text-amber-800 block mb-0.5">
+                                  Excuse Reason:
+                                </span>
                                 &ldquo;{member.pre_meeting_notice_reason}&rdquo;
                               </div>
                             )}
@@ -743,19 +869,28 @@ export function MeetingManagement() {
                       Absent ({absentMembers.length})
                     </h4>
                     {absentMembers.length === 0 ? (
-                      <p className="text-xs text-zinc-400 italic px-3 py-1">No absences recorded.</p>
+                      <p className="text-xs text-zinc-400 italic px-3 py-1">
+                        No absences recorded.
+                      </p>
                     ) : (
                       <div className="divide-y divide-zinc-100 bg-white rounded-lg border border-zinc-100">
                         {absentMembers.map((member) => (
-                          <div key={member.user_id} className="py-2 px-3 hover:bg-zinc-50 transition rounded-lg">
+                          <div
+                            key={member.user_id}
+                            className="py-2 px-3 hover:bg-zinc-50 transition rounded-lg"
+                          >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2.5">
                                 <RoleBadge position={member.position_title} />
                                 <div>
-                                  <p className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}>
+                                  <p
+                                    className={`text-sm font-semibold ${member.domain ? getDomainColorClass(member.domain) : "text-zinc-950"}`}
+                                  >
                                     {member.full_name}
                                   </p>
-                                  <p className="text-[10px] text-zinc-400 font-mono">{member.email}</p>
+                                  <p className="text-[10px] text-zinc-400 font-mono">
+                                    {member.email}
+                                  </p>
                                 </div>
                               </div>
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 uppercase tracking-wider">
@@ -773,7 +908,10 @@ export function MeetingManagement() {
 
             {/* Footer */}
             <div className="mt-4 border-t pt-4 flex justify-end">
-              <Button onClick={() => setRosterModalMeeting(null)} className="rounded-xl">
+              <Button
+                onClick={() => setRosterModalMeeting(null)}
+                className="rounded-xl"
+              >
                 Close
               </Button>
             </div>
