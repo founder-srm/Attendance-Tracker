@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getUsers, updateUser, type AppUser, type MemberDomain, type MemberPosition } from "@/services/members";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RoleBadge } from "@/components/RoleBadge";
+import { RoleBadge } from "@/components/shared/RoleBadge";
 import { getDomainColorClass } from "@/lib/domainColors";
 
 const DOMAINS: MemberDomain[] = ["technical", "creatives", "operations", "outreach", "sponsorship"];

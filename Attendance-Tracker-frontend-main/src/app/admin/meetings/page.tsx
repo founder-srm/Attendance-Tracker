@@ -1,6 +1,6 @@
 "use client";
 
-import { MeetingManagement } from "@/components/MeetingManagement";
+import { MeetingManagement } from "@/components/admin/MeetingManagement";
 
 export default function MeetingsPage() {
   return (
