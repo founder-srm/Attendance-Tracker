@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminDashboard } from "@/components/AdminDashboard";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 /**
  * Admin overview page.

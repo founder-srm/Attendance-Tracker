@@ -17,7 +17,7 @@ import {
 } from "@/services/meetings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RoleBadge } from "@/components/RoleBadge";
+import { RoleBadge } from "@/components/shared/RoleBadge";
 import { getDomainColorClass } from "@/lib/domainColors";
 import Link from "next/link";
 import { QrCode, FileUp, FileText, Play, CheckCircle2, Users, X, AlertCircle } from "lucide-react";

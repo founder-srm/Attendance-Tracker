@@ -1,6 +1,6 @@
 "use client";
 
-import { MemberManagement } from "@/components/MemberManagement";
+import { MemberManagement } from "@/components/admin/MemberManagement";
 
 export default function MembersPage() {
   return (
