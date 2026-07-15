@@ -16,3 +16,10 @@
     color: var(--color-club-navy);
   }
 }
+
+/* QR scanner laser sweep animation — used via Tailwind arbitrary: animate-[scan-line_2.5s_ease-in-out_infinite] */
+@keyframes scan-line {
+  0%   { top: 5%; }
+  50%  { top: 95%; }
+  100% { top: 5%; }
+}

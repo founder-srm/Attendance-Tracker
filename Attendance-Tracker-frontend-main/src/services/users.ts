@@ -27,7 +27,13 @@ export async function getCurrentUser(): Promise<{
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile) return null;
+    if (profileError || !profile) {
+      console.warn(
+        "Profile not found for authenticated user. Denying access (fail-closed).",
+        profileError?.message,
+      );
+      return null;
+    }
 
     return profile;
   } catch (error) {
