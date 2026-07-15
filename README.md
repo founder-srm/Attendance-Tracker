@@ -1,28 +1,32 @@
-## Development
+# Attendance Tracker — Workspace Root
 
-This repo uses **Bun** as the package manager and lockfile source of truth.
+This repository contains two top-level directories:
+
+| Directory | Purpose |
+|---|---|
+| `Attendance-Tracker-frontend-main/` | **Primary working directory** — the Next.js 14 web app. All development happens here. |
+| `backend/` | SQL migration files only. Apply these to your Supabase project via the Supabase dashboard or CLI. |
+| `_archive/` | Reference clone and obsolete files preserved for history. **Do not edit or import from here.** |
+
+## Getting Started
 
 ```bash
-bun install
-bun run dev
-bun run build
-bun run lint
+cd Attendance-Tracker-frontend-main
+npm install
+cp .env.example .env.local   # fill in your Supabase URL + anon key
+npm run dev
 ```
 
-Do not commit `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`.
+Open [http://localhost:3000](http://localhost:3000).
 
+## Database Migrations
 
-## Guides
-  1. Find the Shadcn guides [here](./docs/guides/shadcn.md)
+Run migration files in `backend/supabase/migrations/` in numeric order against your Supabase project.
 
+## Branch Strategy
 
-
-## License
-
-This project is **source-available but not open source**.
-
-You may view the code for reference only. You may not copy, reuse, modify, distribute,
-deploy, or use this project or any part of it for another club, organization, product,
-or platform without written permission.
-
-See the [LICENSE](./LICENSE.md) file for details.
+| Branch | Purpose |
+|---|---|
+| `develop1` | Integration branch — all features merge here first |
+| `feature/NewChanges` | Current feature branch |
+| `main` | Production-ready code |
