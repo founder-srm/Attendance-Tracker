@@ -101,27 +101,7 @@ The database uses a relational PostgreSQL schema:
 * **`meetings`**: Logs scheduled meetings, domain restrictions, MOM storage URLs, agendas, active/closed statuses, and actual start times.
 * **`attendance`**: Maps users to meetings with statuses (`present`, `absent`, `excused`), tracking scan timestamps, check-in source (`manual`, `qr`, `auto`), and advance absence reasons.
 * **`events`**, **`event_venues`**, **`event_shifts`**: Support multi-day events, venue-specific volunteering rosters, and shift request approvals.
-
----
-
-## Git Workflow & Branching Strategy
-We use a feature-branch workflow to prevent merge conflicts and protect the production branch:
-
-```text
-main <--- develop1 <--- feature/your-feature-name
-```
-
-* **Branch Naming Conventions:**
-  * `feature/...` — For building new modules or UI components (e.g., `feature/qr-scanner`).
-  * `fix/...` — For fixing code glitches or security patches (e.g., `fix/auth-fail-closed`).
-  * `docs/...` — For documentation updates (e.g., `docs/schema-update`).
-
-* **Pull Request (PR) Rules:**
-  1. Never commit directly to `main` or `develop1`. Always push to a branch and open a PR.
-  2. Every PR must contain a clear description of what changed and why.
-  3. No self-merging. Another team member must review and approve the code.
-  4. Ensure `npm run build` and linter checks pass with zero errors before requesting review.
-
+  
 ---
 
 ## Security & Fail-Closed Model
