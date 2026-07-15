@@ -29,15 +29,10 @@ export async function getCurrentUser(): Promise<{
 
     if (profileError || !profile) {
       console.warn(
-        "Table users missing or error, returning mock profile for server action:",
+        "Profile not found for authenticated user. Denying access (fail-closed).",
         profileError?.message,
       );
-      return {
-        id: user.id,
-        email: user.email ?? "",
-        role: "admin", // default to admin for ease of testing
-        full_name: user.email?.split("@")[0] ?? "Member",
-      };
+      return null;
     }
 
     return profile;

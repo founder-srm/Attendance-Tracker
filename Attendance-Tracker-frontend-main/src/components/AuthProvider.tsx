@@ -71,15 +71,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     email?: string;
     user_metadata?: Record<string, string>;
   }): Promise<UserProfile | null> => {
-    if (authUser.id.startsWith("mock-")) {
-      return {
-        id: authUser.id,
-        email: authUser.email ?? "",
-        full_name: authUser.user_metadata?.full_name ?? authUser.email?.split("@")[0] ?? "Admin User",
-        role: "admin",
-        created_at: new Date().toISOString(),
-      };
-    }
 
     try {
       const { data: existingProfile, error } = await supabase
@@ -117,17 +108,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .single();
 
     if (createError) {
-      console.warn(
-        "Failed to auto-create profile, returning mock admin profile for testing:",
+      console.error(
+        "Failed to auto-create profile. Denying access (fail-closed):",
         createError.message,
       );
-      return {
-        id: authUser.id,
-        email: authUser.email ?? "",
-        full_name: fallbackName,
-        role: "admin", // Provide admin capabilities for easy testing
-        created_at: new Date().toISOString(),
-      };
+      return null;
     }
 
     return newProfile as UserProfile;

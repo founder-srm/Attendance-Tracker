@@ -1,13 +1,8 @@
 "use client";
 
 import QRCode from "qrcode";
-import { useEffect, useRef, useState } from "react";
-import {
-  generateQRData,
-  isQRValid,
-  parseQRData,
-  secondsRemaining,
-} from "@/lib/qr";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { generateQRTokenAction } from "@/app/actions/attendance";
 
 interface QRDisplayProps {
   meetingId: string;
@@ -21,12 +16,38 @@ export default function QRDisplay({
   actualStartAt,
 }: QRDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [qrData, setQrData] = useState<string>("");
   const [expired, setExpired] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
-  // Interval duration for QR rotation (10 minutes)
+  // QR rotation window: 10 minutes per token
   const ROTATION_INTERVAL_MS = 10 * 60 * 1000;
+
+  /**
+   * Requests a fresh signed token from the server and renders it on the canvas.
+   * The secret never leaves the server — this component only receives the opaque string.
+   */
+  const updateQR = useCallback(
+    async (expiresAt: number) => {
+      const { token, error } = await generateQRTokenAction(meetingId, expiresAt);
+
+      if (error || !token) {
+        console.error("Failed to generate QR token from server:", error);
+        return;
+      }
+
+      if (canvasRef.current) {
+        QRCode.toCanvas(
+          canvasRef.current,
+          token,
+          { width: 280, margin: 2 },
+          (err) => {
+            if (err) console.error("Error rendering QR canvas:", err);
+          },
+        );
+      }
+    },
+    [meetingId],
+  );
 
   useEffect(() => {
     if (!actualStartAt) {
@@ -39,7 +60,7 @@ export default function QRDisplay({
 
     let currentQrExpiry = 0;
 
-    function updateQR() {
+    function scheduleNextQR() {
       const now = Date.now();
       if (now >= meetingEndTime) {
         setExpired(true);
@@ -48,28 +69,14 @@ export default function QRDisplay({
       }
 
       setExpired(false);
-      // Expiration for this specific QR is either 10 minutes from now or the meeting end time
       currentQrExpiry = Math.min(now + ROTATION_INTERVAL_MS, meetingEndTime);
-
-      const data = generateQRData(meetingId, windowMinutes, currentQrExpiry);
-      setQrData(data);
-
-      if (canvasRef.current) {
-        QRCode.toCanvas(
-          canvasRef.current,
-          data,
-          { width: 280, margin: 2 },
-          (error) => {
-            if (error) console.error("Error generating QR Canvas:", error);
-          },
-        );
-      }
+      updateQR(currentQrExpiry);
     }
 
-    // Generate first QR code
-    updateQR();
+    // Generate the first QR token immediately
+    scheduleNextQR();
 
-    // Set up timer check loop (runs every second to manage countdown and trigger updates)
+    // Tick every second: update countdown and trigger rotation when the window expires
     const timerInterval = setInterval(() => {
       const now = Date.now();
       if (now >= meetingEndTime) {
@@ -79,7 +86,6 @@ export default function QRDisplay({
         return;
       }
 
-      // Calculate time remaining based on current QR expiry timestamp
       const remainingSeconds = Math.max(
         0,
         Math.floor((currentQrExpiry - now) / 1000),
@@ -87,12 +93,12 @@ export default function QRDisplay({
       setTimeLeft(remainingSeconds);
 
       if (remainingSeconds <= 0) {
-        updateQR();
+        scheduleNextQR();
       }
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [meetingId, windowMinutes, actualStartAt]);
+  }, [meetingId, windowMinutes, actualStartAt, updateQR]);
 
   const mins = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const secs = String(timeLeft % 60).padStart(2, "0");
